@@ -1,0 +1,31 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "target": "es2015",
+    "module": "esnext",
+    "lib": ["es2020", "dom"],
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@monorepo-fullstack-app/auth": ["packages/auth/src/index.ts"],
+      "@monorepo-fullstack-app/config": ["packages/config/src/index.ts"],
+      "@monorepo-fullstack-app/database": ["packages/database/src/index.ts"],
+      "@monorepo-fullstack-app/error": ["packages/error/src/index.ts"],
+      "@monorepo-fullstack-app/notes": ["packages/notes/src/index.ts"],
+      "@monorepo-fullstack-app/opentelemetry": [
+        "packages/opentelemetry/src/index.ts"
+      ],
+      "@monorepo-fullstack-app/types": ["packages/types/src/index.ts"],
+      "@monorepo-fullstack-app/utils": ["packages/utils/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "tmp"]
+}

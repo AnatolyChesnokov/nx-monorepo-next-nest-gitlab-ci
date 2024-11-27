@@ -1,0 +1,78 @@
+version: '3.7'
+
+services:
+  # database
+  postgres:
+    image: bitnami/postgresql:14.1.0-debian-10-r31
+    restart: unless-stopped
+    ports:
+      - 5433:5433
+
+  # policy decision point
+  oathkeeper:
+    image: oryd/oathkeeper:v0.40
+    command: serve proxy -c "/etc/config/oathkeeper/oathkeeper.yaml"
+    restart: unless-stopped
+    volumes:
+      - ./config/oathkeeper/oathkeeper.yaml:/etc/config/oathkeeper/oathkeeper.yaml
+      - ./config/oathkeeper/id_token.jwks.json:/etc/config/oathkeeper/id_token.jwks.json
+      - ./config/oathkeeper/rules/auth.yaml:/etc/config/oathkeeper/rules/auth.yaml
+      - ./config/oathkeeper/rules/kratos.yaml:/etc/config/oathkeeper/rules/kratos.yaml
+      - ./config/oathkeeper/rules/api-notes.yaml:/etc/config/oathkeeper/rules/api-notes.yaml
+    depends_on:
+      - kratos
+
+  # user federation
+  kratos:
+    image: oryd/kratos:v1.0.0
+    command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier
+    restart: unless-stopped
+    volumes:
+      - ./config/kratos:/etc/config/kratos
+    depends_on:
+      - kratos-migrations
+
+  # user federation migrations
+  kratos-migrations:
+    image: oryd/kratos:v1.0.0
+    command: -c /etc/config/kratos/kratos.yml migrate sql -e --yes
+    restart: on-failure
+    volumes:
+      - ./config/kratos:/etc/config/kratos
+
+  # user federation self service ui (while auth ui is not ready)
+  kratos-selfservice-ui-node:
+    image: oryd/kratos-selfservice-ui-node:v1.0.0
+    restart: unless-stopped
+
+  # acl and rbac management
+  keto:
+    image: oryd/keto:v0.11.1
+    command: serve -c /etc/config/keto/keto.yaml
+    restart: unless-stopped
+    volumes:
+      - ./config/keto/keto.yaml:/etc/config/keto/keto.yaml
+      - ./config/keto/namespaces:/etc/config/keto/namespaces
+    depends_on:
+      - keto-migrations
+
+  # acl and rbac management migrations
+  keto-migrations:
+    image: oryd/keto:v0.11.1
+    command: -c /etc/config/keto/keto.yaml migrate up -y
+    restart: on-failure
+    volumes:
+      - ./config/keto:/etc/config/keto
+
+  # acl and rbac management initialization
+  keto-init:
+    image: oryd/keto:v0.11.1
+    entrypoint: ['sh', '/init.sh']
+    restart: on-failure
+    environment:
+      - KETO_WRITE_REMOTE=keto:4467
+    volumes:
+      - ./config/keto:/etc/config/keto
+      - ./scripts/keto/init.sh:/init.sh
+    depends_on:
+      - keto

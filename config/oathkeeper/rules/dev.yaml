@@ -1,0 +1,165 @@
+#######################################
+#         Dev Access Rules            #
+#######################################
+- id: "dev:mailslurper:anonymous"
+  upstream:
+    preserve_host: true
+    url: "http://mailslurper:4436"
+  match:
+    url: "http://mail.dev.monorepo-fullstack-app.127.0.0.1.sslip.io/<.*>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+  authenticators:
+    - handler: anonymous
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop
+
+- id: "dev:oathkeeper-jwks:anonymous"
+  upstream:
+    preserve_host: true
+    url: "http://127.0.0.1:4456"
+  match:
+    url: "http://oathkeeper.dev.monorepo-fullstack-app.127.0.0.1.sslip.io/.well-known/jwks.json"
+    methods:
+      - GET
+  authenticators:
+    - handler: anonymous
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop
+
+- id: "dev:keto-read:anonymous"
+  upstream:
+    preserve_host: true
+    url: "http://keto:4466"
+    strip_path: /read
+  match:
+    url: "http://keto.dev.monorepo-fullstack-app.127.0.0.1.sslip.io/read/<.*>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+  authenticators:
+    - handler: anonymous
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop
+
+- id: "dev:keto-write:anonymous"
+  upstream:
+    preserve_host: true
+    url: "http://keto:4467"
+    strip_path: /write
+  match:
+    url: "http://keto.dev.monorepo-fullstack-app.127.0.0.1.sslip.io/write/<.*>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+  authenticators:
+    - handler: anonymous
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop
+
+- id: "dev:jaeger:anonymous"
+  upstream:
+    preserve_host: true
+    url: "http://jaeger:16686"
+  match:
+    url: "http://jaeger.dev.monorepo-fullstack-app.127.0.0.1.sslip.io/<.*>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+  authenticators:
+    - handler: anonymous
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop
+
+- id: "dev:jaeger-push:anonymous"
+  upstream:
+    preserve_host: true
+    url: "http://jaeger:14268"
+  match:
+    url: "http://push.jaeger.dev.monorepo-fullstack-app.127.0.0.1.sslip.io/<.*>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+  authenticators:
+    - handler: anonymous
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop
+
+- id: "dev:http-dump:anonymous"
+  upstream:
+    preserve_host: true
+    url: "http://http-dump:3000"
+  match:
+    url: "http://http-dump.dev.monorepo-fullstack-app.127.0.0.1.sslip.io/anonymous"
+    methods:
+      - GET
+  authenticators:
+    - handler: anonymous
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop
+
+- id: "dev:http-dump:protected"
+  upstream:
+    preserve_host: true
+    url: "http://http-dump:3000"
+  match:
+    url: "http://http-dump.dev.monorepo-fullstack-app.127.0.0.1.sslip.io/protected"
+    methods:
+      - GET
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: id_token
+  errors:
+    - handler: redirect
+
+- id: "dev:api-swagger:anonymous"
+  upstream:
+    preserve_host: true
+    url: "http://api:3100"
+  match:
+    url: "http://api.monorepo-fullstack-app.127.0.0.1.sslip.io/swagger/<.*>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+  authenticators:
+    - handler: anonymous
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop

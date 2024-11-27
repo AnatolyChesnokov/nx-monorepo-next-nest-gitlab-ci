@@ -1,0 +1,34 @@
+{
+  "name": "www",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/www",
+  "projectType": "application",
+  "tags": ["type:app"],
+  "targets": {
+    "container": {
+      "executor": "@nx-tools/nx-container:build",
+      "dependsOn": ["build"],
+      "options": {
+        "engine": "docker",
+        "tags": ["registry.gitlab.com/nx-monorepo/fullstack/www"]
+      },
+      "configurations": {
+        "ci": {
+          "load": false,
+          "push": true,
+          "quiet": true,
+          "metadata": {
+            "images": ["registry.gitlab.com/nx-monorepo/fullstack/www"],
+            "tags": [
+              "type=schedule",
+              "type=ref,event=branch",
+              "type=ref,event=tag",
+              "type=ref,event=pr",
+              "type=sha,prefix=sha-"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

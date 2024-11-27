@@ -1,0 +1,66 @@
+////////////////////////////////////////////////
+//            Source & generators             //
+////////////////////////////////////////////////
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["tracing"]
+}
+
+generator dto_with_validation {
+  provider                        = "prisma-generator-nestjs-dto"
+  output                          = "../packages/types/src/lib/generated/classes"
+  outputToNestJsResourceStructure = "true"
+  reExport                        = "true"
+  classValidation                 = "true"
+  prettier                        = "true"
+}
+
+generator dto {
+  provider                        = "prisma-generator-nestjs-dto"
+  output                          = "../packages/types/src/lib/generated/interfaces"
+  outputToNestJsResourceStructure = "true"
+  reExport                        = "true"
+  exportRelationModifierClasses   = "false"
+  createDtoPrefix                 = "ICreate"
+  updateDtoPrefix                 = "IUpdate"
+  connectDtoPrefix                = "IConnect"
+  dtoSuffix                       = "Attributes"
+  entityPrefix                    = "I"
+  classValidation                 = "false"
+  noDependencies                  = "true"
+  outputType                      = "interface"
+  prettier                        = "true"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+////////////////////////////////////////////////
+//            Model definitions               //
+////////////////////////////////////////////////
+model Note {
+  /// @DtoReadOnly
+  /// @description The note id
+  /// @example b1774d2f-05f7-4ea4-b427-0d808bdca583
+  id        String   @id @default(uuid())
+  /// @description The note title
+  /// @example My note
+  /// @minLength 3
+  /// @maxLength 40
+  /// @Length(3, 40)
+  title     String
+  /// @description The note body
+  /// @example This is my note
+  /// @minLength 3
+  /// @maxLength 200
+  /// @Length(3, 200)
+  body      String
+  /// @DtoReadOnly
+  /// @description When the project was created
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("notes")
+}

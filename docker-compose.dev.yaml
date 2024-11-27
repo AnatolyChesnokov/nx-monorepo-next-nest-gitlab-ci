@@ -1,0 +1,117 @@
+version: '3.7'
+
+services:
+  # web gateway
+  traefik:
+    image: traefik:v2.9
+    container_name: dev-traefik
+    restart: unless-stopped
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      # Web entry (:80)
+      - --entrypoints.web.address=:80
+      # Tracing
+      - --tracing.jaeger=true
+      - --tracing.serviceName=traefik:gateway
+      - --tracing.jaeger.samplingServerURL=http://jaeger:5778/sampling
+      - --tracing.jaeger.collector.endpoint=http://jaeger:14268/api/traces?format=jaeger.thrift
+    ports:
+      - 80:80
+      - 443:443
+      - 8080:8080
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  # policy decision point
+  oathkeeper:
+    container_name: dev-oathkeeper
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.services.dev-oathkeeper.loadbalancer.server.port=4455'
+      - 'traefik.http.routers.dev-oathkeeper.rule=HostRegexp(`monorepo-fullstack-app.127.0.0.1.sslip.io`, `{subdomain:[a-z-_.]+}.monorepo-fullstack-app.127.0.0.1.sslip.io`)'
+      - 'traefik.http.routers.dev-oathkeeper.entrypoints=web'
+    environment:
+      - LOG_LEVEL=debug
+    volumes:
+      - ./config/oathkeeper/rules/dev.yaml:/etc/config/oathkeeper/rules/dev.yaml
+
+  # user federation
+  kratos:
+    container_name: dev-kratos
+    environment:
+      - DSN=postgres://postgres:postgres@postgres:5433/auth?sslmode=disable&max_conns=20&max_idle_conns=4
+      - LOG_LEVEL=trace
+
+  # user federation migrations
+  kratos-migrations:
+    container_name: dev-kratos-migrations
+    environment:
+      - DSN=postgres://postgres:postgres@postgres:5433/auth?sslmode=disable&max_conns=20&max_idle_conns=4
+
+  # user federation self service ui (while auth ui is not ready)
+  kratos-selfservice-ui-node:
+    image: oryd/kratos-selfservice-ui-node:v1.0.0
+    restart: unless-stopped
+    container_name: dev-kratos-selfservice-ui-node
+    environment:
+      - KRATOS_PUBLIC_URL=http://kratos:4433/
+      - KRATOS_BROWSER_URL=http://identity.monorepo-fullstack-app.127.0.0.1.sslip.io/kratos/
+
+  # acl and rbac management
+  keto:
+    container_name: dev-keto
+    environment:
+      - DSN=postgres://postgres:postgres@postgres:5433/acl?sslmode=disable&max_conns=20&max_idle_conns=4
+
+  # acl and rbac management migrations
+  keto-migrations:
+    container_name: dev-keto-migrations
+    environment:
+      - DSN=postgres://postgres:postgres@postgres:5433/acl?sslmode=disable&max_conns=20&max_idle_conns=4
+
+  # acl and rbac management initialization
+  keto-init:
+    container_name: dev-keto-init
+    volumes:
+      - keto_init_dev_data:/tmp
+
+  # http dump
+  http-dump:
+    image: nomadscafe.sakuracr.jp/http-dump-request
+    container_name: dev-http-dump
+    restart: unless-stopped
+
+  # database
+  postgres:
+    container_name: dev-postgres
+    environment:
+      - POSTGRESQL_PASSWORD=postgres
+    volumes:
+      - postgres_dev_data:/bitnami/postgresql
+      - ./scripts/postgres/00-init.sql:/docker-entrypoint-initdb.d/00-init.sql
+
+  # tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.19.2
+    container_name: dev-jaeger
+    restart: unless-stopped
+
+  # mailing
+  mailslurper:
+    image: oryd/mailslurper:latest-smtps
+    restart: unless-stopped
+    ports:
+      - 4437:4437 # api port cannot be changed :(
+
+  # api-proxy (other services can access the api)
+  api:
+    image: alpine/socat
+    container_name: dev-api-proxy
+    restart: unless-stopped
+    command: tcp-listen:3100,fork tcp:host.docker.internal:3100
+
+volumes:
+  postgres_dev_data:
+  keto_init_dev_data:

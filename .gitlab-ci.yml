@@ -1,0 +1,122 @@
+include:
+  - template: Workflows/MergeRequest-Pipelines.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Jobs/Code-Quality.gitlab-ci.yml
+  - template: Jobs/Code-Intelligence.gitlab-ci.yml
+  - component: gitlab.com/gl-components/nx-set-shas/nx-set-shas@1.0.1
+
+stages:
+  - .pre
+  - affected
+  - test
+
+default:
+  image: node:20.12@sha256:bf0ef0687ffbd6c7742e1919177826c8bf1756a68b51f003dcfe3a13c31c65fe
+
+###############################
+### Included Jobs
+
+# Secret Detection customization: https://docs.gitlab.com/ee/user/application_security/secret_detection/#customizing-settings
+secret_detection:
+  needs: []
+
+# Dependency Scanning customization: https://docs.gitlab.com/ee/user/application_security/dependency_scanning/#customizing-the-dependency-scanning-settings
+dependency_scanning:
+  needs: []
+
+# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
+sast:
+  needs: []
+
+code_quality:
+  artifacts:
+    paths: [gl-code-quality-report.json]
+
+.base-cache:
+  cache: &npm_cache
+    key:
+      files:
+        - pnpm-lock.yaml
+    paths:
+      - '.pnpm-store'
+    policy: pull
+
+# Creating template for DTE agents
+.dte-agent:
+  extends: [.base-cache]
+  needs: []
+  interruptible: true
+  script:
+    - corepack enable pnpm
+    - pnpm config set store-dir .pnpm-store
+    #- npx nx-cloud start-agent
+
+# Creating template for a job running DTE (orchestrator)
+.base-pipeline:
+  interruptible: true
+  cache:
+    # inherit all global cache settings
+    <<: *npm_cache
+    # override the policy
+    policy: pull-push
+  before_script:
+    - corepack enable pnpm
+    - pnpm config set store-dir .pnpm-store
+    - pnpm i --frozen-lockfile
+  after_script:
+    #- npx nx-cloud stop-all-agents
+  # artifacts:
+  #   expire_in: 5 days
+  #   paths:
+  #     - dist
+
+# Main job running DTE
+nx-dte:
+  stage: affected
+  extends: .base-pipeline
+  variables:
+    GIT_DEPTH: 0
+    NX_CLOUD_DISTRIBUTED_EXECUTION_AGENT_COUNT: 3
+    NX_SKIP_NX_CACHE: true
+  script:
+    - npx nx-cloud start-ci-run --stop-agents-after=build
+    - npx nx-cloud record -- nx format:write --base=$NX_BASE --head=$NX_HEAD
+    - npx nx affected --base=$NX_BASE --head=$NX_HEAD -t lint,test,build --parallel=3 --exclude=utils,auth,database,error,utils,notes,opentelemetry,types,config
+    # - npx nx affected --base=$NX_BASE --head=$NX_HEAD -t lint,test,build,e2e-ci --parallel=2
+  artifacts:
+    expire_in: 5 days
+    paths:
+      # - node_modules/.cache/nx
+      - dist
+  when: delayed
+  start_in: 15 seconds
+
+# Create as many agents as you want
+nx-dte-agent1:
+  extends: .dte-agent
+  stage: affected
+
+nx-dte-agent2:
+  extends: .dte-agent
+  stage: affected
+
+build:docker:
+  extends: [.base-cache]
+  image: gperdomor/nx-docker:20.12-alpine@sha256:9596d545760ec0ae65c995cca4797b0027aff5dfa3bbf0bdf72b570f36b650b1
+  services:
+    - docker:26.0.0-dind@sha256:016c45d9e31461802186e8e9aaa394f35e173a8ce913ea7195a672cdc97102f2
+  variables:
+    GIT_DEPTH: 0
+    # Nx Contaienr
+    INPUT_PUSH: 'true'
+    INPUT_ENGINE: 'docker'
+    INPUT_NEXT_APP_IMAGES: registry.gitlab.com/nx-monorepo/fullstack/next-app-with-docker
+    INPUT_NEST_APP_IMAGES: registry.gitlab.com/nx-monorepo/fullstack/nest-app-with-docker
+  before_script:
+    - !reference [.base-pipeline, before_script]
+    # Login to registry
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+  script:
+    - npx nx affected --base=$NX_BASE --head=$NX_HEAD -t container --no-dte --parallel=2
